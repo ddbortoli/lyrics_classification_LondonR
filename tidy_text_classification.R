@@ -47,24 +47,24 @@ tracks <- tracks %>%
   # Replace NA genres with missing string ("")
   mutate(across(starts_with("artist_genre"), ~replace_na(.x, ""))) %>%
   mutate(
-    is_dm = if_any(starts_with("artist_genre"), ~str_detect(.x, "death metal")),
-    is_bm = if_any(starts_with("artist_genre"), ~str_detect(.x, "black metal")),
-    is_pm = if_any(starts_with("artist_genre"), ~str_detect(.x, "power metal")),
-    is_doom = if_any(starts_with("artist_genre"), ~str_detect(.x, "doom metal")),
-    is_folk = if_any(starts_with("artist_genre"), ~str_detect(.x, "folk metal")),
-    is_pop = if_any(starts_with("artist_genre"), ~str_detect(.x, "pop")),
-    is_hip_hop = if_any(starts_with("artist_genre"), ~str_detect(.x, "hip hop")),
+    is_genre_dm = if_any(starts_with("artist_genre"), ~str_detect(.x, "death metal")),
+    is_genre_bm = if_any(starts_with("artist_genre"), ~str_detect(.x, "black metal")),
+    is_genre_pm = if_any(starts_with("artist_genre"), ~str_detect(.x, "power metal")),
+    is_genre_doom = if_any(starts_with("artist_genre"), ~str_detect(.x, "doom metal")),
+    is_genre_folk = if_any(starts_with("artist_genre"), ~str_detect(.x, "folk metal")),
+    is_genre_pop = if_any(starts_with("artist_genre"), ~str_detect(.x, "pop")),
+    is_genre_hip_hop = if_any(starts_with("artist_genre"), ~str_detect(.x, "hip hop")),
   ) %>% 
   rowwise() %>% 
-  mutate(n_cats = sum(c_across(matches("is_")))) %>% 
+  mutate(n_cats = sum(c_across(matches("is_genre")))) %>% 
   ungroup() %>% 
   filter(n_cats == 1) %>% 
-  mutate(genre = factor(case_when(is_bm ~ "black metal",
-                                  is_dm ~ "death metal",
-                                  is_pm ~ "power metal",
+  mutate(genre = factor(case_when(is_genre_bm ~ "black metal",
+                                  is_genre_dm ~ "death metal",
+                                  is_genre_pm ~ "power metal",
                                   TRUE ~ NA_character_
   ))) %>% 
-  select(-contains("artist_genre"), -starts_with("is_")) 
+  select(-contains("artist_genre"), -starts_with("is_genre")) 
 
 
 ## 2) Pre-processing ----
@@ -100,7 +100,6 @@ lyrics_train <- training(lyrics_split)
 lyrics_test <- testing(lyrics_split)
 
 
-# Better thing to do would be to fit to training resamples
 # Here we use cross-validation, will allow us to tune without
 # leaking data to the test set.
 set.seed(234)
@@ -172,7 +171,7 @@ tfidf_nb_predictions %>%
   roc_curve(truth = genre, ends_with("metal")) %>% 
   ggplot(aes(x = 1 - specificity, y = sensitivity)) + 
   geom_line(aes(col = .level), size = 1) +
-  geom_abline(lty = 2) 
+  geom_abline(lty = 2)
 
 
 ## Exercise (1) ----
@@ -340,7 +339,7 @@ tidy_lyrics
 
 ## Compute average embedding per song - takes a little bit of time
 # Each word has an embedding - so each song has an average embedding
-set.seed(1871)
+set.seed(2022)
 
 track_embeddings <- tidy_lyrics %>%
   left_join(glove6b, by = c("word" = "token")) %>%
@@ -382,7 +381,7 @@ cossim <- cossim %>%
 
 # Some examples
 similar_tracks <- cossim %>%
-  find_similar("Saatana", n = 8)
+  find_similar("Rancid Gluttonous Morbid Obesity", n = 3)
 similar_tracks
 
 
@@ -391,7 +390,9 @@ similar_tracks %>%
   get_lyrics_from_track_name(lyrics, .) 
 
 # Can compare the lyrics too to see whether they are in fact similar
-get_lyrics_from_track_name(lyrics, "Saatana") %>% lapply(cat)
+get_lyrics_from_track_name(lyrics, "Rancid Gluttonous Morbid Obesity") %>% 
+  first() %>% 
+  cat()
 
 
 # Finally we fit a model using the pre-trained word embeddings.
@@ -477,12 +478,13 @@ tune_wf <- workflow() %>%
 # Tune over hyperparams (equivalent to fit_resamples)
 # We now give it a grid to tune over too.
 set.seed(1871)
-tune_rs <- tune_grid(
-  tune_wf,
-  lyrics_folds,
-  grid = hyp_grid,
-  control = control_resamples(save_pred = TRUE)
-)
+
+# tune_rs <- tune_grid(
+#   tune_wf,
+#   lyrics_folds,
+#   grid = hyp_grid,
+#   control = control_resamples(save_pred = TRUE)
+# )
 
 # Here is one we made earlier
 tune_rs <- readRDS("tune_rs.rds")
@@ -534,7 +536,8 @@ final_fit %>%
   geom_abline(lty = 2) 
 
 
-# Compare to previous models
+# Compare to previous models (note we now use autoplot() and so the 
+# colours are different models, not different genres)
 final_fit %>% 
   collect_predictions() %>% 
   mutate(model = "Tuned Random Forest") %>% 
