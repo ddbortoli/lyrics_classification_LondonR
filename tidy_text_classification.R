@@ -318,11 +318,25 @@ full_rf_fit <- fit(tfidf_sw_wf, lyrics_train)
 
 # We can then find which of the features were most important when classifying
 # genre. This can be done using the {vip} package.
-
-full_rf_fit %>% 
-  extract_fit_parsnip() %>% 
-  vip(scale = TRUE) + 
+full_rf_fit %>%
+  extract_fit_parsnip() %>%
+  vip(scale = TRUE) +
   labs(title = "Variable Importance Scores for random forest model")
+
+
+full_rf_fit %>%
+  predict(lyrics_test) %>%
+  bind_cols(lyrics_test) %>%
+  unnest_tokens(word, lyrics) %>%
+  anti_join(my_stopwords) %>%
+  count(.pred_class, word) %>%
+  group_by(.pred_class) %>%
+  slice_max(n = 10, order_by = n) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>% 
+  ggplot(aes(x = n, y = word)) +
+  geom_col() +
+  facet_wrap(~.pred_class, scales = "free")
 
 
 ## 8) Word embeddings ----
