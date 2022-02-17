@@ -332,8 +332,7 @@ full_rf_fit %>%
   count(.pred_class, word) %>%
   group_by(.pred_class) %>%
   slice_max(n = 10, order_by = n) %>%
-  ungroup() %>%
-  mutate(word = reorder(word, n)) %>% 
+  mutate(word = reorder(word, n)) %>%
   ggplot(aes(x = n, y = word)) +
   geom_col() +
   facet_wrap(~.pred_class, scales = "free")
