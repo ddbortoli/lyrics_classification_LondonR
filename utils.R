@@ -257,9 +257,10 @@ get_lyrics_from_track_id <- function(df, my_track_ids) {
 get_lyrics_from_track_name <- function(df, my_track_names) {
   
   map(my_track_names, ~ df %>% 
-        filter(track_name %in% .x)
+        filter(track_name %in% .x) %>%
+        slice(1)
   ) %>%
-    bind_rows() %>% 
+    bind_rows() %>%
     pull(lyrics, track_name) %>%
     as.list()
 }
