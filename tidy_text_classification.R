@@ -49,11 +49,7 @@ tracks <- tracks %>%
   mutate(
     is_genre_dm = if_any(starts_with("artist_genre"), ~str_detect(.x, "death metal")),
     is_genre_bm = if_any(starts_with("artist_genre"), ~str_detect(.x, "black metal")),
-    is_genre_pm = if_any(starts_with("artist_genre"), ~str_detect(.x, "power metal")),
-    is_genre_doom = if_any(starts_with("artist_genre"), ~str_detect(.x, "doom metal")),
-    is_genre_folk = if_any(starts_with("artist_genre"), ~str_detect(.x, "folk metal")),
-    is_genre_pop = if_any(starts_with("artist_genre"), ~str_detect(.x, "pop")),
-    is_genre_hip_hop = if_any(starts_with("artist_genre"), ~str_detect(.x, "hip hop")),
+    is_genre_pm = if_any(starts_with("artist_genre"), ~str_detect(.x, "power metal"))
   ) %>% 
   rowwise() %>% 
   mutate(n_cats = sum(c_across(matches("is_genre")))) %>% 
@@ -64,7 +60,7 @@ tracks <- tracks %>%
                                   is_genre_pm ~ "power metal",
                                   TRUE ~ NA_character_
   ))) %>% 
-  select(-contains("artist_genre"), -starts_with("is_genre")) 
+  select(-contains("artist_genre"), -starts_with("is_genre"))
 
 
 ## 2) Pre-processing ----
@@ -144,7 +140,7 @@ nb_spec
 
 
 # Create nb_wf which we will fit to each of the resamples.
-tfidf_nb_wf <- tfidf_wf %>% 
+tfidf_nb_wf <- tfidf_wf %>%
   add_model(nb_spec)
 
 # Fit to each of the folds, allowing 1 fold to be the test set 
@@ -214,13 +210,16 @@ my_stopwords <- my_stopwords %>%
   distinct(word)
 
 
-# Create vector of stopwords from previous analyses
+# Create vector of stopwords
 sw_vec <- my_stopwords %>% pull(word)
 
 
 # If we weren't fitting a model - we would remove them with anti_join()
+dim(tidy_lyrics)
 tidy_lyrics <- tidy_lyrics %>%
   anti_join(my_stopwords)
+
+dim(tidy_lyrics)
 
 # New recipe using stopwords
 tfidf_sw_rec <- recipe(genre ~ lyrics, data = lyrics_train) %>%
@@ -272,12 +271,13 @@ tfidf_sw_predictions <- collect_predictions(tfidf_sw_fit)
 tfidf_sw_metrics
 
 # Get a confusion matrix averaged over each of the folds
-conf_mat_resampled(tfidf_nb_fit, tidy = FALSE) %>%
+conf_mat_resampled(tfidf_sw_fit, tidy = FALSE) %>%
   autoplot(type = "heatmap")
 
 # We didn't see any improvement here. Instead, let's try doing another form
 # of pre-processing, in an exercise.
 
+## 6) Stemming words ----
 # Another type of pre-processing that we might do is stemming words.
 # This will group words with the same/nearly the same meaning and so may
 # make our TFIDF features more informative. 
@@ -287,7 +287,6 @@ wordStem("happy") # SnowballC package
 wordStem("feeling")
 
 # And so to apply it to a dataframe, we use wordStem() inside a mutate():
-## 6) Stemming words ----
 tidy_lyrics <- tidy_lyrics %>%
   mutate(word_stemmed = wordStem(word))
 
@@ -309,11 +308,11 @@ tidy_lyrics <- tidy_lyrics %>%
 # - step_tf()
 # - step_lda()
 
-## 7) Variable Importance Plots
+## 7) Variable Importance Plots ----
 
 # If we want to calculate variable importance, we will need to refit
 # to create a single model (as opposed to fitting a model to each of the
-# resampling folds with fit_resamples). 
+# resampling folds with fit_resamples).
 
 full_rf_fit <- fit(tfidf_sw_wf, lyrics_train)
 
@@ -327,6 +326,12 @@ full_rf_fit %>%
 
 
 ## 8) Word embeddings ----
+
+# Can compare the lyrics too to see whether they are in fact similar
+get_lyrics_from_track_name(lyrics, "Horrendous Member Dismemberment") %>% 
+  first() %>% 
+  cat()
+
 # Get pre-trained GloVe word embeddings
 glove6b <- embedding_glove6b(dimensions = 50)
 glove6b
@@ -339,7 +344,7 @@ tidy_lyrics
 
 ## Compute average embedding per song - takes a little bit of time
 # Each word has an embedding - so each song has an average embedding
-set.seed(2022)
+set.seed(2020)
 
 track_embeddings <- tidy_lyrics %>%
   left_join(glove6b, by = c("word" = "token")) %>%
@@ -381,18 +386,14 @@ cossim <- cossim %>%
 
 # Some examples
 similar_tracks <- cossim %>%
-  find_similar("Rancid Gluttonous Morbid Obesity", n = 3)
+  find_similar("Horrendous Member Dismemberment", n = 3)
 similar_tracks
 
 
 similar_tracks %>%
   pull(track_name) %>%
-  get_lyrics_from_track_name(lyrics, .) 
+  get_lyrics_from_track_name(lyrics, .)
 
-# Can compare the lyrics too to see whether they are in fact similar
-get_lyrics_from_track_name(lyrics, "Rancid Gluttonous Morbid Obesity") %>% 
-  first() %>% 
-  cat()
 
 
 # Finally we fit a model using the pre-trained word embeddings.
@@ -441,11 +442,11 @@ embed_predictions %>%
   roc_curve(truth = genre, ends_with("metal")) %>% 
   ggplot(aes(x = 1 - specificity, y = sensitivity)) + 
   geom_line(aes(col = .level), size = 1) +
-  geom_abline(lty = 2) 
+  geom_abline(lty = 2)
 
 ## Exercise (3) ----
 # 1. What would happen if we refit and again made a variable importance 
-# plot? Why would the result we useless here?
+# plot? Why would the result be difficult/impossible to interpret?
 
 ## 9) Hyperparameter tuning --------------------------------------------------
 
